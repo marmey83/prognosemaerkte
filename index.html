@@ -407,8 +407,10 @@ function render(){
     return matchesCat(m,cur)&&(!q||(m.question&&m.question.toLowerCase().indexOf(q)>=0));
   });
 
+  // Movers: >5% change, sorted by absolute change
   var movers=f.filter(isMover).sort(function(a,b){return Math.abs(getChange(b))-Math.abs(getChange(a));});
-  var flips=f.filter(isCoinFlip);
+  // Flips: 37-63%, sorted by liquidity (well-maintained open questions)
+  var flips=f.filter(isCoinFlip).sort(function(a,b){return (parseFloat(b.liquidity)||0)-(parseFloat(a.liquidity)||0);});
 
   var sb=document.getElementById("sb");
   if(f.length){
@@ -426,15 +428,30 @@ function render(){
   if(!f.length){ct.innerHTML="<div class='empty'>Keine Märkte gefunden.</div>";return;}
 
   if(tab==="movers"){
+    // MOVERS TAB: nur Märkte mit Bewegung, keine anderen
     if(movers.length)renderSection(ct,movers,"🔥","Grösste Bewegungen 24h","auto");
     else ct.innerHTML="<div class='empty'>Keine Movers (&gt;5%) gefunden.</div>";
+
   }else if(tab==="coinflip"){
+    // COINFLIP TAB: nur offene Fragen, nach Liquidität
     if(flips.length)renderSection(ct,flips,"⚖️","Offene Fragen — niemand weiss es","flip");
     else ct.innerHTML="<div class='empty'>Keine Coin Flips gefunden.</div>";
+
   }else{
-    if(movers.length)renderSection(ct,movers.slice(0,6),"🔥","Grösste Bewegungen 24h","auto");
-    if(flips.length)renderSection(ct,flips.slice(0,6),"⚖️","Offene Fragen","flip");
-    renderSection(ct,f.slice(0,40),"📊","Alle Märkte","null");
+    // ALLE TAB: kuratiert — Highlights oben, Rest ohne Duplikate
+    var moverIds={};
+    var flipIds={};
+    var topMovers=movers.slice(0,4);
+    var topFlips=flips.slice(0,4);
+    topMovers.forEach(function(m){moverIds[m.id]=true;});
+    topFlips.forEach(function(m){flipIds[m.id]=true;});
+
+    // Rest = alles was nicht schon als Mover oder Flip oben erscheint
+    var rest=f.filter(function(m){return !moverIds[m.id]&&!flipIds[m.id];}).slice(0,30);
+
+    if(topMovers.length)renderSection(ct,topMovers,"🔥","Grösste Bewegungen 24h","auto");
+    if(topFlips.length)renderSection(ct,topFlips,"⚖️","Offene Fragen","flip");
+    if(rest.length)renderSection(ct,rest,"📊","Weitere nach Volumen","null");
   }
 }
 
