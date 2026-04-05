@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prognosemärkte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0c0c0e;color:#fff;font-family:'DM Sans',sans-serif;min-height:100vh}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+
+  header{
+    border-bottom:1px solid rgba(255,255,255,.07);
+    padding:20px 32px;
+    display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;
+    background:rgba(12,12,14,.92);backdrop-filter:blur(12px);z-index:100;
+  }
+  .logo{font-family:'Fraunces',serif;font-size:22px;font-weight:700;letter-spacing:-.02em}
+  .logo-sub{font-family:'DM Mono',monospace;font-size:11px;color:rgba(255,255,255,.3);margin-left:12px;letter-spacing:.05em}
+  .status{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:11px;color:rgba(255,255,255,.35)}
+  .dot{width:6px;height:6px;border-radius:50%;background:#4ade80}
+  .dot.loading{background:#facc15;animation:pulse 1s infinite}
+  .dot.error{background:#f87171}
+  .refresh-btn{
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+    border-radius:8px;color:rgba(255,255,255,.6);padding:6px 14px;
+    font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;
+  }
+  .refresh-btn:hover{background:rgba(255,255,255,.1)}
+  .refresh-btn:disabled{cursor:not-allowed;opacity:.5}
+
+  #ticker-wrap{
+    background:rgba(250,204,21,.06);
+    border-bottom:1px solid rgba(250,204,21,.15);
+    border-top:1px solid rgba(250,204,21,.15);
+    padding:8px 0;overflow:hidden;display:none;
+  }
+  #ticker-inner{
+    display:inline-block;white-space:nowrap;
+    animation:ticker 80s linear infinite;
+    font-family:'DM Mono',monospace;font-size:12px;
+    color:rgba(250,204,21,.7);letter-spacing:.03em;padding-left:100%;
+  }
+
+  main{max-width:1280px;margin:0 auto;padding:32px 32px 64px}
+
+  .controls{display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;align-items:center}
+  .cats{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+  .cat-btn{
+    padding:6px 16px;border-radius:100px;
+    border:1px solid rgba(255,255,255,.1);
+    background:transparent;color:rgba(255,255,255,.45);
+    font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;
+    transition:all .15s;
+  }
+  .cat-btn.active{border-color:rgba(250,204,21,.5);background:rgba(250,204,21,.1);color:#facc15}
+  .search-input{
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+    border-radius:8px;padding:7px 14px;color:#fff;
+    font-size:13px;font-family:'DM Sans',sans-serif;width:200px;outline:none;
+  }
+  .search-input::placeholder{color:rgba(255,255,255,.25)}
+
+  .stats{
+    display:flex;gap:24px;margin-bottom:28px;padding:14px 20px;
+    background:rgba(255,255,255,.02);border-radius:10px;
+    border:1px solid rgba(255,255,255,.05);
+  }
+  .stat-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:600;margin-right:8px}
+  .stat-label{font-size:12px;color:rgba(255,255,255,.35);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+
+  .card{
+    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+    border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;
+    animation:fadeUp .4s ease both;transition:border-color .2s,background .2s;
+  }
+  .card:hover{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.15)}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .card-q{font-family:'Fraunces',serif;font-size:14px;line-height:1.45;color:rgba(255,255,255,.88);font-weight:500;flex:1}
+  .card-vol{font-family:'DM Mono',monospace;font-size:11px;color:rgba(255,255,255,.35);white-space:nowrap;margin-top:2px}
+  .outcome-label{font-size:11px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .prob-row{display:flex;align-items:center;gap:10px}
+  .prob-track{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden}
+  .prob-fill{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.16,1,.3,1)}
+  .prob-pct{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;min-width:38px;text-align:right}
+
+  .skeleton{
+    background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);
+    border-radius:12px;height:130px;animation:pulse 1.5s ease infinite;
+  }
+  .error-box{
+    background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);
+    border-radius:10px;padding:20px;color:#f87171;
+    font-family:'DM Mono',monospace;font-size:13px;
+  }
+  .empty{
+    text-align:center;padding:80px 0;color:rgba(255,255,255,.25);
+    font-family:'Fraunces',serif;font-size:18px;font-style:italic;
+  }
+
+  footer{
+    border-top:1px solid rgba(255,255,255,.05);padding:16px 32px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .footer-note{font-family:'DM Mono',monospace;font-size:11px;color:rgba(255,255,255,.2)}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:baseline">
+    <span class="logo">Prognosemärkte</span>
+    <span class="logo-sub">via Polymarket</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="status">
+      <div class="dot loading" id="dot"></div>
+      <span id="status-text">Lädt…</span>
+    </div>
+    <button class="refresh-btn" id="refresh-btn" onclick="fetchData()">↻</button>
+  </div>
+</header>
+
+<div id="ticker-wrap">
+  <div id="ticker-inner"></div>
+</div>
+
+<main>
+  <div class="controls">
+    <div class="cats" id="cats"></div>
+    <input class="search-input" type="text" placeholder="Suchen…" id="search" oninput="renderGrid()">
+  </div>
+  <div class="stats" id="stats" style="display:none">
+    <div><span class="stat-val" id="s-markets">—</span><span class="stat-label">Märkte</span></div>
+    <div><span class="stat-val" id="s-events">—</span><span class="stat-label">Events</span></div>
+    <div><span class="stat-val" id="s-vol">—</span><span class="stat-label">Gesamtvolumen</span></div>
+  </div>
+  <div id="content"></div>
+</main>
+
+<footer>
+  <span class="footer-note">Nur zur Anzeige — kein Handel möglich · Daten: Polymarket Gamma API</span>
+  <span class="footer-note">Auto-refresh 3 min</span>
+</footer>
+
+<script>
+const PROXY = 'https://pdwcnxuqzcvwufeqqatu.supabase.co/functions/v1/polymarket-proxy';
+const CATS = [
+  {id:'all',label:'Alle'},
+  {id:'politics',label:'Politik'},
+  {id:'crypto',label:'Crypto'},
+  {id:'sports',label:'Sport'},
+  {id:'economics',label:'Wirtschaft'},
+  {id:'science',label:'Wissenschaft'},
+];
+
+let allMarkets = [];
+let allEvents = [];
+let currentCat = 'all';
+
+// Build category buttons
+const catsEl = document.getElementById('cats');
+CATS.forEach(c => {
+  const btn = document.createElement('button');
+  btn.className = 'cat-btn' + (c.id === 'all' ? ' active' : '');
+  btn.textContent = c.label;
+  btn.onclick = () => { currentCat = c.id; document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); fetchData(); };
+  catsEl.appendChild(btn);
+});
+
+function fmt(v) {
+  return v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : v >= 1000 ? `$${(v/1000).toFixed(0)}K` : `$${v.toFixed(0)}`;
+}
+
+function parse(val) {
+  if (!val) return [];
+  try { return typeof val === 'string' ? JSON.parse(val) : val; } catch { return []; }
+}
+
+async function proxyFetch(path, params={}) {
+  const url = new URL(PROXY);
+  url.searchParams.set('path', path);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
+  const r = await fetch(url.toString());
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+async function fetchData() {
+  const dot = document.getElementById('dot');
+  const st = document.getElementById('status-text');
+  const btn = document.getElementById('refresh-btn');
+
+  dot.className = 'dot loading';
+  st.textContent = 'Lädt…';
+  btn.disabled = true;
+
+  showSkeletons();
+
+  try {
+    const p = {closed:'false', limit:'100', order:'volume24hr', ascending:'false'};
+    if (currentCat !== 'all') p.tag = currentCat;
+
+    const [evData, mData] = await Promise.all([
+      proxyFetch('events', p),
+      proxyFetch('markets', {...p, active:'true'}),
+    ]);
+
+    allEvents = Array.isArray(evData) ? evData : [];
+    allMarkets = Array.isArray(mData) ? mData : [];
+
+    const now = new Date().toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'});
+    dot.className = 'dot';
+    st.textContent = `Aktualisiert ${now}`;
+
+    renderTicker();
+    renderGrid();
+  } catch(e) {
+    dot.className = 'dot error';
+    st.textContent = 'Fehler';
+    document.getElementById('content').innerHTML = `<div class="error-box">⚠ ${e.message}</div>`;
+    document.getElementById('stats').style.display = 'none';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderTicker() {
+  const wrap = document.getElementById('ticker-wrap');
+  const inner = document.getElementById('ticker-inner');
+  if (!allEvents.length) { wrap.style.display='none'; return; }
+  const items = allEvents.slice(0,12).map(e => {
+    const m = e.markets?.[0];
+    const prices = parse(m?.outcomePrices);
+    const pct = Math.round((parseFloat(prices[0])||.5)*100);
+    return `${e.title} — ${pct}%`;
+  }).join('   ·   ');
+  inner.textContent = items + '   ·   ' + items;
+  wrap.style.display = 'block';
+}
+
+function renderGrid() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = allMarkets.filter(m => !q || m.question?.toLowerCase().includes(q));
+
+  // Stats
+  const statsEl = document.getElementById('stats');
+  if (filtered.length) {
+    const total = filtered.reduce((s,m)=>s+(parseFloat(m.volume)||0),0);
+    document.getElementById('s-markets').textContent = filtered.length;
+    document.getElementById('s-events').textContent = allEvents.length;
+    document.getElementById('s-vol').textContent = fmt(total);
+    statsEl.style.display = 'flex';
+  } else {
+    statsEl.style.display = 'none';
+  }
+
+  const content = document.getElementById('content');
+  if (!filtered.length) {
+    content.innerHTML = '<div class="empty">Keine Märkte gefunden.</div>';
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+
+  filtered.forEach((market, idx) => {
+    const outcomes = parse(market.outcomes);
+    const prices = parse(market.outcomePrices);
+    const vol = parseFloat(market.volume)||0;
+    const topPrice = parseFloat(prices[0])||.5;
+    const pct = Math.round(topPrice*100);
+    const barColor = pct>=60?'#4ade80':pct<=40?'#f87171':'#facc15';
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.animationDelay = `${idx*30}ms`;
+
+    const outcomesHtml = (outcomes.slice(0,2)||['Ja','Nein']).map((o,i)=>{
+      const p = parseFloat(prices[i])||0;
+      const pp = Math.round(p*100);
+      const color = i===0?barColor:'rgba(255,255,255,0.3)';
+      return `
+        <div>
+          <div class="outcome-label">${o}</div>
+          <div class="prob-row">
+            <div class="prob-track"><div class="prob-fill" style="width:${pp}%;background:${color}"></div></div>
+            <span class="prob-pct" style="color:${color}">${pp}%</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="card-q">${market.question||''}</div>
+        <div class="card-vol">${fmt(vol)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">${outcomesHtml}</div>`;
+
+    grid.appendChild(card);
+  });
+
+  content.innerHTML = '';
+  content.appendChild(grid);
+}
+
+function showSkeletons() {
+  document.getElementById('stats').style.display = 'none';
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  for(let i=0;i<9;i++){
+    const s = document.createElement('div');
+    s.className = 'skeleton';
+    s.style.animationDelay = `${i*80}ms`;
+    grid.appendChild(s);
+  }
+  document.getElementById('content').innerHTML = '';
+  document.getElementById('content').appendChild(grid);
+}
+
+// Auto-refresh every 3 min
+fetchData();
+setInterval(fetchData, 3*60*1000);
+</script>
+</body>
+</html>
